@@ -1,0 +1,161 @@
+---
+title: "Bus 4093H Assignment 6"
+author: "Ramanpreet Chand"
+date: "November 1, 2016"
+output: word_document
+---
+#The Gender Gap in Mathematics and Reading
+
+##Question 1
+###Importing the Dataset
+```{r}
+#setwd
+setwd("/Volumes/My Passport/Workspace/R_Files/gender-gap-mathematics")
+
+#Load packages
+library(data.table)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+
+#Import the dataset
+file <- "ECLSK_ass6.csv"
+data <- fread(file, data.table = FALSE, na.strings = "NULL")
+
+#Class Declarations
+class(data$C1R4RSCL) <- "numeric"
+class(data$C1R4MSCL) <- "numeric"
+class(data$C5R4RSCL) <- "numeric"
+class(data$C5R4MSCL) <- "numeric"
+
+#Dimensions
+dim(data)
+
+#Data Frame
+str(data, max.level = 1)
+```
+
+Using the fread() function of the data.tables library, I imported the **Early Childhood Longitudinal Study (ECLS)**, while classifing each score in reading and math as a **numeric** data type. A numeric data type, unlike the integer data type, will store an exact value instead of rounded integer.
+
+##Question No.2
+```{r}
+data <- data %>% filter(C1R4RSCL > 0, C1R4MSCL > 0, C5R4RSCL > 0, C5R4MSCL > 0, GENDER > 0, RACE > 0, P1HMAFB > 0)
+```
+
+I've eliminated the observations that contain negative values by filtering the dataset's values to be greater than 0.
+
+##Question No.3
+```{r}
+data <- data %>% mutate(GENDER = plyr::mapvalues(data$GENDER, from=c(1,2), to=c("Male", "Female")),
+                        RACE = plyr::mapvalues(data$RACE, from=c(1,2,3,4,5,6,7,8), 
+                                               to=c("White", "Non-His Black or Afn Amn, Non-His", "His, Race Sepific",
+                                                    "His, Race Non-Specific", "Asian", "Native Hawaiian, other PI",
+                                                    "Amn Indian or ALSK Native", "More than one Race, Non-His")))
+```
+
+I've redefined the **Gender** and **Race** categories using the mapvalues() function from the plyr package.
+
+```{r}
+#Data Reshape:
+dataS <- gather(data, Score_Type, Score, C1R4RSCL:C5R4MSCL)
+head(dataS,5)
+```
+
+I've reshaped my data using the **gather()** function of the **tidyr** package. Now, I can access the scores of 1st grade and 5th grade, reading and mathematics from one column.
+
+##Question No.4
+```{r}
+data.AvgScore <- dataS %>% group_by(GENDER, Score_Type) %>% summarize(avgScore = round(mean(Score, na.rm=TRUE),2)) %>% data.table()
+data.AvgScore <- spread(data.AvgScore, Score_Type, avgScore)
+data.AvgScore
+```
+
+As the Harvard Paper stated, male and female 1st graders on average start with similar reading and mathematical abilities.
+However, by the 5th grade, male and female students diverge in Reading and Math. Females seem to fair on average better in Reading compared to Boys who fair on average better in Math.
+
+##Question No.5
+```{r}
+data.AvgScore.Race <- dataS %>% group_by(RACE, Score_Type) %>% summarize(avgScore = round(mean(Score, na.rm=TRUE),2)) %>% data.table()
+data.AvgScore.Race <- spread(data.AvgScore.Race, Score_Type, avgScore)
+data.AvgScore.Race
+```
+
+Among the 8 races included in the dataset, 1st grade and 5th grade **Asians** have the highest average in Reading and Math. The weakest Race is **American Indian or Alaska Native** in 1st and 5th grade who scored on average less than the other races in Reading and Math.
+
+##Question No.6
+```{r}
+data.quantile <- data %>% group_by(GENDER) %>% summarize(C1Read10 = quantile(C1R4RSCL, .1, na.rm = TRUE),
+                                    C1Read90 = quantile(C1R4RSCL, .9, na.rm = TRUE),
+                                    C1Math10 = quantile(C1R4MSCL, .1, na.rm = TRUE),
+                                    C1Math90 = quantile(C1R4MSCL, .9, na.rm = TRUE),
+                                    C5Read10 = quantile(C5R4RSCL, .1, na.rm = TRUE),
+                                    C5Read90 = quantile(C5R4RSCL, .9, na.rm = TRUE),
+                                    C5Math10 = quantile(C5R4MSCL, .1, na.rm = TRUE),
+                                    C5Math90 = quantile(C5R4MSCL, .9, na.rm = TRUE)) %>% data.table()
+data.quantile
+```
+
+In 1st grade, 10% of male and female students score around 25~26 points and 90% tend to score around 45~47 points in reading. In 5th grade, the variance increases where 10% of males are scoring 89.26 points while 10% of females of scoring 96.38 points, and where 90% of males are scoring 163.720 points while 90% of females of scoring 165.855 points. 
+A similar change in variance is reflected in mathematics scores. However, male students score better by 5th grade, according to the quantiles.
+
+##Question No.7
+```{r}
+data.Score <- dataS %>% select(GENDER, Score_Type, Score) %>% group_by(GENDER) %>% data.frame()
+head(data.Score, 5)
+
+data.dens <- ggplot(data = data.Score, aes(x=Score, ..density..)) +
+  labs(x="Score", y="Density", title="Density of Scores by Gender") +
+  geom_density(aes(color=factor(GENDER), fill=factor(Score_Type)), alpha=0.1)
+data.dens
+```
+
+In 1st grade, male and female students were are par with their performances in reading and mathematics. However, by 5th grade males students performed better than female students in reading, while female students performed better than male in mathematics.
+
+##Question No.8
+```{r}
+data.Race <- data %>% select(C5R4RSCL, C5R4MSCL, RACE) %>% group_by(RACE) %>% data.frame()
+data.Race <- gather(data.Race, RACE, Score, C5R4RSCL:C5R4MSCL)
+head(data.Race,5)
+
+data.RaceDens <- ggplot(data = data.Race, aes(x=Score, ..density..)) +
+  labs(x="Score", y="Density", title="Density of 5th Grade Scores Categorized by Race") +
+  geom_density(aes(color=factor(RACE), fill=factor(RACE)), alpha=0.1) +
+  facet_wrap(~RACE, ncol=2)
+
+data.RaceDens
+```
+
+Among the 8 races, Asian 5th graders have a nearly normalized score set in reading and mathematics, compared to American Indian or Alaskan natives or Non-Hispanic Blacks or African Americans that are non-Hispanic 5th graders whose scores are more skewed to the right.
+
+##Question No.9
+```{r}
+data.Mothers <- dataS %>% select(P1HMAFB, Score_Type, Score) %>% group_by(P1HMAFB) %>% data.frame()
+head(data.Mothers,5)
+
+data.MothersPlot <- ggplot(na.omit(data.Mothers), aes(x=P1HMAFB, y=Score)) + 
+  labs(x = "Mothers' Age", y = "Score", title = "Mothers' Age at Birth Against Score") +
+  geom_point(color="blue") +
+  geom_smooth(method=lm, color="orange", se = FALSE) +
+  facet_wrap(~Score_Type)
+
+data.MothersPlot
+```
+
+There seems to be an almost normalized distribution of childrens' scores in reading and mathetimatics in the 1st grade depending on the mothers age.
+
+However, by the 5th grade, score levels increase in variance. Particularly in mathematics, 5th graders seems to perform better than in reading.
+
+##Question No.10
+```{r}
+data.MothersByRacePlot <- na.omit(data) %>% ggplot(aes(x=P1HMAFB, y=C5R4MSCL)) +
+  geom_point(color="lightgreen") +
+  labs(x="Mothers' Age", y="Score", title = "Race, Mothers' Age, and Score") +
+  geom_smooth(method=lm, color="black", se=FALSE) +
+  facet_wrap(~RACE, ncol = 2)
+
+data.MothersByRacePlot
+```
+
+Among the 8 races included in the Harvard study, White mothers have the greatest variance in terms of age and their child's mathematics score in 5th grade. It seems almost as likely for a mother in her early 20s to give birth to a child who would score well in comparison to a mother in her late 30s.
+
+However, American Indian or Alaskan Native mothers along with Native Hawaiian and other mothers tend to have their first child when they are younger, less than 30 years. According to the scatter plots, these children tend to perform less well compared to children whose mother first bore a child at 30 years or older.
